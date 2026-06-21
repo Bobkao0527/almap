@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Albion Map - 阿爾比恩皇家大陸導航系統</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: #020202;
+      color: #e2e8f0;
+    }
+    .mono-font {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    
+    /* Strict high-contrast styling */
+    .border-clear {
+      border: 1px solid #222530;
+    }
+    .bg-dark-card {
+      background: #090a0f;
+    }
+    
+    /* Interactive map view canvas controls */
+    #map-viewport {
+      cursor: grab;
+    }
+    #map-viewport:active {
+      cursor: grabbing;
+    }
+
+    /* Standard map colors for climates (Clear & subtle) */
+    .color-dot-white { background-color: #e2e8f0; }
+    .color-dot-green { background-color: #10b981; }
+    .color-dot-yellow { background-color: #f59e0b; }
+    .color-dot-blue { background-color: #06b6d4; }
+    .color-dot-purple { background-color: #8b5cf6; }
+    .color-dot-red { background-color: #ef4444; }
+
+    /* Flow line speed */
+    @keyframes march {
+      to {
+        stroke-dashoffset: -20;
+      }
+    }
+    .path-flow-animation {
+      stroke-dasharray: 6, 4;
+      animation: march 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col overflow-x-hidden">
+
+  <!-- Header -->
+  <header class="border-b border-zinc-800 bg-black px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 sticky top-0">
+    <div class="flex items-center gap-3">
+      <div class="bg-zinc-900 border border-zinc-700 p-2 rounded">
+        <i class="fa-solid fa-compass text-amber-500 text-lg"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-black tracking-wider text-white uppercase flex items-center gap-2">
+          Albion Map <span class="text-xs font-normal text-zinc-500 px-1.5 py-0.5 border border-zinc-800 rounded">v2.1</span>
+        </h1>
+        <p class="text-xs text-zinc-400 font-medium">阿爾比恩皇家大陸導航系統 (相對位置與立體分層版)</p>
+      </div>
+    </div>
+    
+    <!-- Info Badge -->
+    <div class="flex items-center gap-3 text-xs flex-wrap justify-center">
+      <span id="data-status" class="px-2.5 py-1 rounded bg-red-950/40 text-red-400 border border-red-900/50 flex items-center gap-1.5">
+        <i class="fa-solid fa-circle-exclamation"></i> 尚未連接圖資
+      </span>
+      <button onclick="fetchOnlineCSV()" class="px-3 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 transition flex items-center gap-1">
+        <i class="fa-solid fa-sync"></i> 重新載入線上圖資
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Grid -->
+  <main class="flex-1 flex flex-col lg:flex-row p-4 sm:p-6 gap-6 max-w-[1700px] mx-auto w-full">
+    
+    <!-- Left Panel: Control / Config / Navigation List -->
+    <section class="w-full lg:w-[400px] flex flex-col gap-5 shrink-0">
+      
+      <!-- Control Panel Card -->
+      <div class="bg-dark-card border-clear rounded-xl p-5 shadow-2xl">
+        <h2 class="text-sm font-bold text-zinc-300 mb-4 flex items-center justify-between">
+          <span class="flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-amber-500"></i> 導航路徑設定
+          </span>
+          <button onclick="toggleManualInput()" class="text-xs text-amber-500 hover:underline flex items-center gap-1">
+            <i class="fa-solid fa-edit"></i> 手動CSV面板
+          </button>
+        </h2>
+
+        <!-- Manual CSV Input Accordion (Hidden by default) -->
+        <div id="manual-csv-panel" class="hidden mb-4 bg-black border border-zinc-800 rounded-lg p-3">
+          <label class="block text-[11px] text-zinc-400 font-bold mb-1">手動貼上 CSV 資料 (忽略欄位標頭)：</label>
+          <textarea id="csv-paste-area" rows="4" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs font-mono text-zinc-300 focus:outline-none focus:border-amber-500" placeholder="圖名|NE|SE|SW|NW|CP|CPN|CPE|CPS|CPW|等級|氣候|類型|地圖圖檔"></textarea>
+          <button onclick="loadPastedCSV()" class="w-full mt-2 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold py-2 rounded transition">
+            解析並套用手動資料
+          </button>
+        </div>
+        
+        <!-- From Input -->
+        <div class="relative mb-3">
+          <label class="block text-[11px] text-zinc-400 font-bold mb-1 uppercase tracking-wider">起點地圖 (Start)</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-3 flex items-center text-emerald-500 text-xs">
+              <i class="fa-solid fa-location-dot"></i>
+            </span>
+            <input type="text" id="start-search" 
+                   class="w-full bg-black border border-zinc-800 focus:border-zinc-500 rounded px-10 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none transition"
+                   placeholder="輸入起點地圖名稱..." autocomplete="off" disabled>
+            <button id="clear-start" class="absolute inset-y-0 right-3 flex items-center text-zinc-500 hover:text-zinc-300 hidden">
+              <i class="fa-solid fa-times-circle"></i>
+            </button>
+          </div>
+          <!-- Autocomplete Dropdown -->
+          <div id="start-dropdown" class="absolute w-full z-30 bg-black border border-zinc-800 rounded mt-1 shadow-2xl overflow-y-auto max-h-52 hidden"></div>
+        </div>
+        
+        <!-- Swap Button -->
+        <div class="flex justify-center -my-1.5 relative z-10">
+          <button onclick="swapStartEnd()" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 w-7 h-7 rounded flex items-center justify-center shadow transition-all transform hover:rotate-180">
+            <i class="fa-solid fa-sync"></i>
+          </button>
+        </div>
+
+        <!-- To Input -->
+        <div class="relative mb-4">
+          <label class="block text-[11px] text-zinc-400 font-bold mb-1 uppercase tracking-wider">終點地圖 (End)</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-3 flex items-center text-red-500 text-xs">
+              <i class="fa-solid fa-flag-checkered"></i>
+            </span>
+            <input type="text" id="end-search" 
+                   class="w-full bg-black border border-zinc-800 focus:border-zinc-500 rounded px-10 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none transition"
+                   placeholder="輸入終點地圖名稱..." autocomplete="off" disabled>
+            <button id="clear-end" class="absolute inset-y-0 right-3 flex items-center text-zinc-500 hover:text-zinc-300 hidden">
+              <i class="fa-solid fa-times-circle"></i>
+            </button>
+          </div>
+          <!-- Autocomplete Dropdown -->
+          <div id="end-dropdown" class="absolute w-full z-30 bg-black border border-zinc-800 rounded mt-1 shadow-2xl overflow-y-auto max-h-52 hidden"></div>
+        </div>
+
+        <!-- Route Filter Toggle Preferences -->
+        <div class="bg-black/80 border border-zinc-800 rounded p-3 mb-4">
+          <label class="block text-[11px] text-zinc-400 font-bold mb-2 uppercase tracking-wider">安全偏好選擇 (允許通行區域)</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex flex-col items-center justify-center p-2 rounded border border-zinc-800 hover:bg-zinc-900/50 cursor-pointer transition select-none">
+              <input type="checkbox" id="allow-blue" checked class="w-4 h-4 text-blue-600 bg-black border-zinc-700 rounded focus:ring-0 mb-1">
+              <span class="text-[10px] text-blue-400 font-bold">藍區</span>
+            </label>
+            <label class="flex flex-col items-center justify-center p-2 rounded border border-zinc-800 hover:bg-zinc-900/50 cursor-pointer transition select-none">
+              <input type="checkbox" id="allow-yellow" checked class="w-4 h-4 text-yellow-500 bg-black border-zinc-700 rounded focus:ring-0 mb-1">
+              <span class="text-[10px] text-yellow-400 font-bold">黃區</span>
+            </label>
+            <label class="flex flex-col items-center justify-center p-2 rounded border border-zinc-800 hover:bg-zinc-900/50 cursor-pointer transition select-none">
+              <input type="checkbox" id="allow-red" checked class="w-4 h-4 text-red-500 bg-black border-zinc-700 rounded focus:ring-0 mb-1">
+              <span class="text-[10px] text-red-500 font-bold">紅區</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Calculate Trigger Button -->
+        <button id="calculate-btn" onclick="calculateRoute()" disabled class="w-full bg-zinc-800 text-zinc-600 font-bold text-xs py-3 px-4 rounded transition-all flex items-center justify-center gap-2 cursor-not-allowed uppercase tracking-wider">
+          <i class="fa-solid fa-magnifying-glass"></i> 請先匯入圖資資料
+        </button>
+      </div>
+
+      <!-- Route Navigation Steps Panel -->
+      <div id="route-panel" class="bg-dark-card border-clear rounded-xl p-5 shadow-2xl flex-1 flex flex-col hidden min-h-[300px]">
+        <div class="flex items-center justify-between mb-3 border-b border-zinc-800 pb-2">
+          <h3 class="text-xs font-bold text-zinc-400 flex items-center gap-2">
+            <i class="fa-solid fa-list-ol"></i> 路線導航指引
+          </h3>
+          <span id="route-stats" class="text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"></span>
+        </div>
+        
+        <!-- Step items list container -->
+        <div id="route-steps" class="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[350px]">
+          <!-- Dynanmically Filled -->
+        </div>
+      </div>
+      
+    </section>
+
+    <!-- Right Panel: Isometric Topological Panoramic Canvas -->
+    <section class="flex-1 flex flex-col bg-black border border-zinc-800 rounded-xl p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+      
+      <!-- Viewport Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-4 z-10">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-900 border border-zinc-700 text-zinc-400 tracking-widest">3D RELATIVE TOPOLOGY MAP</span>
+            <span id="total-maps-count" class="text-xs text-zinc-500"></span>
+          </div>
+          <h3 id="flow-visualizer-title" class="text-lg font-bold text-white mt-0.5">
+            皇家大陸相對位置流動全景
+          </h3>
+        </div>
+        
+        <!-- Interactive Controls -->
+        <div id="map-nav-controllers" class="flex items-center gap-2 hidden">
+          <button onclick="prevStep()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="上一張">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          
+          <button id="play-btn" onclick="toggleAutoPlay()" class="px-4 h-9 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center justify-center gap-1" title="自動播放路徑">
+            <i class="fa-solid fa-play"></i> <span>自動播</span>
+          </button>
+          
+          <button onclick="nextStep()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="下一張">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+          
+          <div class="border-l border-zinc-800 h-6 mx-1"></div>
+          
+          <button onclick="resetCamera()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="重設視角">
+            <i class="fa-solid fa-compress"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Canvas Viewport -->
+      <div class="flex-1 relative flex flex-col justify-between min-h-[500px]">
+        
+        <!-- Legend overlays for clear information -->
+        <div class="absolute top-2 left-2 z-10 flex flex-col gap-1.5 text-[10px] bg-black/90 border border-zinc-800 p-2.5 rounded">
+          <p class="font-bold text-zinc-400 border-b border-zinc-800 pb-1 mb-1">圖例說明 (氣候與區域)</p>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full color-dot-white inline-block"></span> <span>雪地 / 山嶽 (White)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full color-dot-green inline-block"></span> <span>森林 (Green)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full color-dot-yellow inline-block"></span> <span>草原 (Yellow)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full color-dot-blue inline-block"></span> <span>高地 (Blue)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full color-dot-purple inline-block"></span> <span>沼澤 (Purple)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full color-dot-red inline-block"></span> <span>紅城 / 皇家 (Red)</span>
+          </div>
+          <p class="mt-1.5 font-bold text-zinc-400 border-b border-zinc-800 pb-1 mb-1">安全等級外框</p>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 border border-blue-500 inline-block"></span> <span>藍區 (安全)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 border border-yellow-500 inline-block"></span> <span>黃區 (不掉裝PVP)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 border border-red-500 inline-block"></span> <span>紅區 (掉裝PVP)</span>
+          </div>
+        </div>
+
+        <!-- 3D Relative Map Drag Area -->
+        <div class="flex-1 w-full relative overflow-hidden bg-[#050505] border border-zinc-900 rounded-lg">
+          <svg id="map-viewport" class="w-full h-full select-none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Defs for markers and filters -->
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#f59e0b"/>
+              </marker>
+              <marker id="arrow-pillar" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#8b5cf6"/>
+              </marker>
+              <!-- Drop shadows -->
+              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="10" stdDeviation="6" flood-color="#000000" flood-opacity="0.8"/>
+              </filter>
+            </defs>
+            
+            <!-- Global Interactive Transformer Group -->
+            <g id="map-transform-group">
+              <!-- Grid Background of viewport -->
+              <g id="viewport-grid" stroke="rgba(255, 255, 255, 0.015)" stroke-width="1">
+                <!-- Dynamically populated or static lines -->
+              </g>
+              
+              <!-- Vertical pillars/connecting elevators (Layer transitions) -->
+              <g id="map-3d-pillars">
+                <!-- Lines drawn between same (X,Y) but different Z maps -->
+              </g>
+
+              <!-- Map boundary linkage lines (Outer connections) -->
+              <g id="map-route-connections">
+                <!-- Drawing connection lines between map card boundaries -->
+              </g>
+
+              <!-- Isometric Diamond Map Cards -->
+              <g id="map-blocks-group">
+                <!-- Dynamically populated diamonds -->
+              </g>
+            </g>
+          </svg>
+        </div>
+        
+        <!-- Route Placeholder Screen State -->
+        <div id="route-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-0 pointer-events-none">
+          <i class="fa-solid fa-map-marked-alt text-5xl text-zinc-800 mb-3"></i>
+          <h4 class="text-sm font-bold text-zinc-500 mb-1">未載入路徑軌跡</h4>
+          <p id="placeholder-subtext" class="text-xs text-zinc-600 max-w-sm leading-relaxed">請確認圖資載入，並於左側輸入起訖點規劃以建立地理相對位置全景。</p>
+        </div>
+
+        <!-- Selected Focus Map Card Detailed Info Badge -->
+        <div id="active-step-overlay-card" class="bg-black border border-zinc-800 rounded-lg p-4 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-4 hidden z-10">
+          <div class="flex items-center gap-3">
+            <div id="overlay-dir-badge" class="w-12 h-12 rounded flex flex-col items-center justify-center font-black text-xs text-black shadow-inner">
+              <span id="overlay-badge-dir" class="mono-font">-</span>
+              <span id="overlay-badge-index" class="text-[9px] opacity-70">0/0</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 id="overlay-map-name" class="text-base font-bold text-white">地圖名稱</h4>
+                <span id="overlay-map-tier" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400">V 階</span>
+                <span id="overlay-map-zone" class="px-1.5 py-0.5 rounded text-[10px] font-bold">區域狀態</span>
+              </div>
+              <p id="overlay-instruction" class="text-xs text-zinc-400 mt-1">進入點門：-- 往 出口門：-- 移動中</p>
+            </div>
+          </div>
+          <div class="flex gap-4 md:text-right shrink-0">
+            <div>
+              <p class="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">目前地圖氣候</p>
+              <p id="overlay-map-climate" class="text-xs font-bold text-zinc-300">森林</p>
+            </div>
+            <div class="border-l border-zinc-800 pl-4">
+              <p class="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">地圖內耗時估算</p>
+              <p id="overlay-map-distance" class="text-sm font-black text-amber-500">0.0 km</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      
+    </section>
+  </main>
+
+  <!-- Notification Popup -->
+  <div id="custom-alert" class="fixed bottom-6 right-6 z-50 bg-zinc-950 border border-zinc-850 rounded p-4 shadow-2xl max-w-sm flex items-start gap-3 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-350">
+    <div class="bg-amber-500/10 text-amber-500 p-2 rounded">
+      <i class="fa-solid fa-circle-info text-md"></i>
+    </div>
+    <div class="flex-1">
+      <h5 class="text-xs font-bold text-zinc-200">系統資訊</h5>
+      <p id="alert-msg" class="text-xs text-zinc-400 mt-0.5 leading-relaxed"></p>
+    </div>
+    <button onclick="hideAlert()" class="text-zinc-600 hover:text-zinc-400">
+      <i class="fa-solid fa-times"></i>
+    </button>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-zinc-900 bg-black py-4 px-6 text-center text-xs text-zinc-600 mt-auto">
+    <p>© 2026 Albion Relative Topology Map Royal Continent Navigation system.</p>
+  </footer>
+
+  <script>
+    // --- 1. Global States ---
+    let mapData = [];
+    let mapDict = {};
+    let activeRoute = [];
+    let activeRouteStepsDetails = [];
+    let currentRouteIndex = 0;
+    let isPlaying = false;
+    let playInterval = null;
+
+    // Viewport drag and zoom states
+    let zoomLevel = 0.85;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let startDragX = 0;
+    let startDragY = 0;
+
+    // Local Isometric map offsets (within the individual diamond box map cards)
+    const portCoordinatesLocal = {
+      'CP':  { x: 0,   y: 0 },
+      'NE':  { x: 45,  y: -22.5 },
+      'NW':  { x: -45, y: -22.5 },
+      'SW':  { x: -45, y: 22.5 },
+      'SE':  { x: 45,  y: 22.5 },
+      'CPE': { x: 30,  y: 0 },
+      'CPN': { x: 0,   y: -15 },
+      'CPW': { x: -30, y: 0 },
+      'CPS': { x: 0,   y: 15 }
+    };
+
+    // Mathematical logical coordinates for pathfinding (Dijkstra)
+    const logicalCoords = {
+      'CP':  { x: 0, y: 0 },
+      'NE':  { x: 1.4142, y: 1.4142 },
+      'NW':  { x: -1.4142, y: 1.4142 },
+      'SW':  { x: -1.4142, y: -1.4142 },
+      'SE':  { x: 1.4142, y: -1.4142 },
+      'CPE': { x: 1.4142, y: 0 },
+      'CPN': { x: 0, y: 1.4142 },
+      'CPW': { x: -1.4142, y: 0 },
+      'CPS': { x: 0, y: -1.4142 }
+    };
+
+    const oppositePorts = {
+      'NE': 'SW', 'SW': 'NE',
+      'NW': 'SE', 'SE': 'NW',
+      'CPN': 'CPS', 'CPS': 'CPN',
+      'CPE': 'CPW', 'CPW': 'CPE',
+      'CP': 'CP'
+    };
+
+    const climateThemes = {
+      'white':  { cn: '雪地/山嶽', color: '#e2e8f0', stroke: '#e2e8f0', bg: '#18181b' },
+      'green':  { cn: '森林', color: '#10b981', stroke: '#059669', bg: '#022c22' },
+      'yellow': { cn: '草原', color: '#f59e0b', stroke: '#d97706', bg: '#451a03' },
+      'blue':   { cn: '高地', color: '#06b6d4', stroke: '#0891b2', bg: '#083344' },
+      'purple': { cn: '沼澤', color: '#8b5cf6', stroke: '#7c3aed', bg: '#2e1065' },
+      'red':    { cn: '皇家紅城', color: '#ef4444', stroke: '#dc2626', bg: '#450a0a' }
+    };
+
+    const zoneTypes = {
+      'blue':   { cn: '藍區 (安全)', border: '#3b82f6', textClass: 'text-blue-400', bgClass: 'bg-blue-950/80 text-blue-400 border border-blue-900/40' },
+      'yellow': { cn: '黃區 (非致命PVP)', border: '#eab308', textClass: 'text-yellow-500', bgClass: 'bg-yellow-950/80 text-yellow-500 border border-yellow-900/40' },
+      'red':    { cn: '紅區 (致命PVP)', border: '#ef4444', textClass: 'text-red-500', bgClass: 'bg-red-950/80 text-red-500 border border-red-900/40' }
+    };
+
+    function sanitizeConnectionValue(val) {
+      if (!val) return '';
+      const clean = val.trim();
+      return (clean === '-' || clean === '無' || clean === 'none') ? '' : clean;
+    }
+
+    // Calculate Port-to-Port Distance
+    function computePortDistance(portA, portB) {
+      const p1 = logicalCoords[portA];
+      const p2 = logicalCoords[portB];
+      if (!p1 || !p2) return 999;
+      return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+    }
+
+    // --- 2. CSV Parser Engine ---
+    function parseCSV(csvText) {
+      const lines = csvText.split(/\r?\n/);
+      if (lines.length <= 1) return [];
+      
+      const parsed = [];
+      const headersLine = lines[0];
+      const delimiter = headersLine.includes('|') ? '|' : ',';
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        let cols = [];
+        if (delimiter === '|') {
+          cols = line.split('|');
+        } else {
+          let insideQuote = false;
+          let currentStr = '';
+          for (let char of line) {
+            if (char === '"') {
+              insideQuote = !insideQuote;
+            } else if (char === ',' && !insideQuote) {
+              cols.push(currentStr.trim());
+              currentStr = '';
+            } else {
+              currentStr += char;
+            }
+          }
+          cols.push(currentStr.trim());
+        }
+        
+        if (cols.length < 5) continue; 
+        
+        const mapObj = {
+          name: cols[0].trim(),
+          NE: sanitizeConnectionValue(cols[1]),
+          SE: sanitizeConnectionValue(cols[2]),
+          SW: sanitizeConnectionValue(cols[3]),
+          NW: sanitizeConnectionValue(cols[4]),
+          CP: sanitizeConnectionValue(cols[5]),
+          CPN: sanitizeConnectionValue(cols[6]),
+          CPE: sanitizeConnectionValue(cols[7]),
+          CPS: sanitizeConnectionValue(cols[8]),
+          CPW: sanitizeConnectionValue(cols[9]),
+          tier: cols[10] ? cols[10].trim() : 'IV',
+          climate: cols[11] ? cols[11].toLowerCase().trim() : 'green',
+          type: cols[12] ? cols[12].toLowerCase().trim() : 'blue',
+          img: cols[13] ? cols[13].trim() : ''
+        };
+        parsed.push(mapObj);
+      }
+      return parsed;
+    }
+
+    // Load CSV data from Google Sheets Link
+    async function fetchOnlineCSV() {
+      const statusBadge = document.getElementById('data-status');
+      statusBadge.className = "px-2.5 py-1 rounded bg-yellow-950/40 text-yellow-400 border border-yellow-900/50 flex items-center gap-1.5";
+      statusBadge.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> 線上讀取中...`;
+      
+      try {
+        const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSwg5Cv3Da1oLmhpN1wTlm0GgecgZ240Y2Hdkg4TRT1CFjAYzlpDnVqmCk7XBRT_8XDPY-1lCBOrg5P/pub?output=csv';
+        const res = await fetch(csvUrl);
+        if (!res.ok) throw new Error('CORS 或伺服器拒絕響應');
+        
+        const csvText = await res.text();
+        const data = parseCSV(csvText);
+        if (data.length === 0) throw new Error('圖資資料解析無數據');
+        
+        initializeSystemWithData(data, false);
+      } catch (err) {
+        console.warn('線上圖資載入失敗，等待手動粘貼匯入...', err);
+        statusBadge.className = "px-2.5 py-1 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 flex items-center gap-1.5";
+        statusBadge.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> 線上讀取受阻 (請手動匯入)`;
+        document.getElementById('placeholder-subtext').innerHTML = `線上圖資可能受瀏覽器沙盒 CORS 限制。請展開左側「手動CSV面板」貼上內容以啟動。`;
+        showAlert('線上圖資連線受阻，請展開左側面板手動匯入！');
+      }
+    }
+
+    // Parse user manual pasted CSV data
+    function loadPastedCSV() {
+      const pasteArea = document.getElementById('csv-paste-area');
+      const csvText = pasteArea.value.trim();
+      if (!csvText) {
+        showAlert('請先在輸入區貼上阿爾比恩圖資！');
+        return;
+      }
+      
+      let fullText = csvText;
+      // Inject dummy header row if user didn't paste headers
+      if (!csvText.startsWith('圖名') && !csvText.startsWith('Map')) {
+        fullText = "圖名|NE|SE|SW|NW|CP|CPN|CPE|CPS|CPW|等級|氣候|類型|地圖圖檔\n" + csvText;
+      }
+
+      try {
+        const data = parseCSV(fullText);
+        if (data.length === 0) throw new Error('無效格式');
+        initializeSystemWithData(data, true);
+        document.getElementById('manual-csv-panel').classList.add('hidden');
+      } catch (err) {
+        showAlert('手動解析 CSV 錯誤，請確認欄位區隔符號！');
+      }
+    }
+
+    // Save and map the dataset to local structures
+    function initializeSystemWithData(data, isManual) {
+      mapData = data;
+      mapDict = {};
+      mapData.forEach(m => {
+        mapDict[m.name] = m;
+      });
+
+      // Enable text fields
+      document.getElementById('start-search').disabled = false;
+      document.getElementById('end-search').disabled = false;
+      
+      const calcBtn = document.getElementById('calculate-btn');
+      calcBtn.disabled = false;
+      calcBtn.className = "w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs py-3 px-4 rounded transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider shadow-lg";
+
+      setupAutocomplete();
+
+      const statusBadge = document.getElementById('data-status');
+      statusBadge.className = "px-2.5 py-1 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-900/50 flex items-center gap-1.5";
+      statusBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${isManual ? '手動' : '線上'}載入 (${mapData.length} 張圖)`;
+
+      showAlert('圖資匯入成功！您可以開始在左側規劃尋路路線。');
+    }
+
+    function toggleManualInput() {
+      const panel = document.getElementById('manual-csv-panel');
+      panel.classList.toggle('hidden');
+    }
+
+    // --- 3. Auto Completion List ---
+    function setupAutocomplete() {
+      const startInput = document.getElementById('start-search');
+      const startDropdown = document.getElementById('start-dropdown');
+      const endInput = document.getElementById('end-search');
+      const endDropdown = document.getElementById('end-dropdown');
+      
+      configureInput(startInput, startDropdown, 'clear-start');
+      configureInput(endInput, endDropdown, 'clear-end');
+    }
+
+    function configureInput(inputEl, dropdownEl, clearBtnId) {
+      const clearBtn = document.getElementById(clearBtnId);
+      
+      inputEl.addEventListener('input', () => {
+        const query = inputEl.value.trim().toLowerCase();
+        if (!query) {
+          dropdownEl.classList.add('hidden');
+          clearBtn.classList.add('hidden');
+          return;
+        }
+        clearBtn.classList.remove('hidden');
+
+        const matches = mapData.filter(m => 
+          m.name.toLowerCase().includes(query) || 
+          (m.tier && m.tier.toLowerCase().includes(query))
+        );
+
+        if (matches.length === 0) {
+          dropdownEl.innerHTML = `<div class="p-2.5 text-xs text-zinc-500 text-center">查無此地圖</div>`;
+        } else {
+          dropdownEl.innerHTML = matches.map(m => {
+            const climateColor = climateThemes[m.climate]?.color || '#94a3b8';
+            const zoneName = zoneTypes[m.type]?.cn || m.type;
+            const textCol = zoneTypes[m.type]?.textClass || 'text-zinc-400';
+            return `
+              <div class="flex items-center justify-between p-2.5 cursor-pointer hover:bg-zinc-900 border-b border-zinc-900 transition" onclick="selectMap('${inputEl.id}', '${m.name}')">
+                <div>
+                  <span class="text-xs font-bold text-zinc-200">${m.name}</span>
+                  <span class="text-[9px] ${textCol} font-semibold ml-1.5">${zoneName}</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${climateColor}"></span>
+                  <span class="text-[10px] text-zinc-500">${m.tier}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+        dropdownEl.classList.remove('hidden');
+      });
+
+      clearBtn.addEventListener('click', () => {
+        inputEl.value = '';
+        dropdownEl.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        inputEl.focus();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!inputEl.contains(e.target) && !dropdownEl.contains(e.target)) {
+          dropdownEl.classList.add('hidden');
+        }
+      });
+    }
+
+    function selectMap(inputId, value) {
+      document.getElementById(inputId).value = value;
+      document.getElementById(inputId === 'start-search' ? 'start-dropdown' : 'end-dropdown').classList.add('hidden');
+      document.getElementById(inputId === 'start-search' ? 'clear-start' : 'clear-end').classList.remove('hidden');
+    }
+
+    function swapStartEnd() {
+      const startInput = document.getElementById('start-search');
+      const endInput = document.getElementById('end-search');
+      const temp = startInput.value;
+      startInput.value = endInput.value;
+      endInput.value = temp;
+      
+      const startClear = document.getElementById('clear-start');
+      const endClear = document.getElementById('clear-end');
+      if (startInput.value) startClear.classList.remove('hidden'); else startClear.classList.add('hidden');
+      if (endInput.value) endClear.classList.remove('hidden'); else endClear.classList.add('hidden');
+    }
+
+    // Alert functions
+    function showAlert(msg) {
+      const alertContainer = document.getElementById('custom-alert');
+      document.getElementById('alert-msg').textContent = msg;
+      alertContainer.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      alertContainer.classList.add('translate-y-0', 'opacity-100');
+      
+      setTimeout(hideAlert, 6000);
+    }
+
+    function hideAlert() {
+      const alertContainer = document.getElementById('custom-alert');
+      alertContainer.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      alertContainer.classList.remove('translate-y-0', 'opacity-100');
+    }
+
+    // --- 4. Dijkstra Router Logic ---
+    function findOptimalRoute(startMap, endMap, allowedTypes) {
+      const graph = {};
+      const allowedMaps = mapData.filter(m => allowedTypes.includes(m.type));
+      const allowedMapNames = new Set(allowedMaps.map(m => m.name));
+
+      if (!allowedMapNames.has(startMap)) {
+        showAlert(`起點地圖 ${startMap} 屬於目前禁行的安全等級！`);
+        return null;
+      }
+      if (!allowedMapNames.has(endMap)) {
+        showAlert(`終點地圖 ${endMap} 屬於目前禁行的安全等級！`);
+        return null;
+      }
+
+      function addEdge(u, v, weight) {
+        if (!graph[u]) graph[u] = [];
+        graph[u].push({ node: v, dist: weight });
+      }
+
+      // Inside map port connection logic
+      allowedMaps.forEach(m => {
+        const portsOnThisMap = [];
+        const portNames = ['NE', 'SE', 'SW', 'NW', 'CP', 'CPN', 'CPE', 'CPS', 'CPW'];
+        
+        portNames.forEach(p => {
+          if (m[p]) {
+            portsOnThisMap.push(p);
+          }
+        });
+
+        for (let i = 0; i < portsOnThisMap.length; i++) {
+          for (let j = i + 1; j < portsOnThisMap.length; j++) {
+            const p1 = portsOnThisMap[i];
+            const p2 = portsOnThisMap[j];
+            const dist = computePortDistance(p1, p2);
+            addEdge(`${m.name}:${p1}`, `${m.name}:${p2}`, dist);
+            addEdge(`${m.name}:${p2}`, `${m.name}:${p1}`, dist);
+          }
+        }
+      });
+
+      // Inter-map boundaries links
+      allowedMaps.forEach(m => {
+        const portNames = ['NE', 'SE', 'SW', 'NW', 'CP', 'CPN', 'CPE', 'CPS', 'CPW'];
+        
+        portNames.forEach(p => {
+          const targetMapName = m[p];
+          if (targetMapName && allowedMapNames.has(targetMapName)) {
+            const targetMap = mapDict[targetMapName];
+            
+            let matchingTargetPort = null;
+            portNames.forEach(tp => {
+              if (targetMap[tp] === m.name) {
+                matchingTargetPort = tp;
+              }
+            });
+            
+            if (!matchingTargetPort) {
+              matchingTargetPort = oppositePorts[p] || 'CP';
+            }
+
+            // Weight for transitions
+            addEdge(`${m.name}:${p}`, `${targetMapName}:${matchingTargetPort}`, 0.2);
+          }
+        });
+      });
+
+      // Virtual Wrappers
+      const virtualStart = "START";
+      const virtualEnd = "END";
+      
+      const portNames = ['NE', 'SE', 'SW', 'NW', 'CP', 'CPN', 'CPE', 'CPS', 'CPW'];
+      portNames.forEach(p => {
+        const startM = mapDict[startMap];
+        if (startM && startM[p]) {
+          addEdge(virtualStart, `${startMap}:${p}`, 0);
+        }
+        const endM = mapDict[endMap];
+        if (endM && endM[p]) {
+          addEdge(`${endMap}:${p}`, virtualEnd, 0);
+        }
+      });
+
+      // Priority queue Dijkstra
+      const dists = {};
+      const prev = {};
+      const pq = new PriorityQueue();
+
+      dists[virtualStart] = 0;
+      pq.enqueue(virtualStart, 0);
+
+      while (!pq.isEmpty()) {
+        const { element: currNode } = pq.dequeue();
+
+        if (currNode === virtualEnd) break;
+
+        const neighbors = graph[currNode] || [];
+        for (let edge of neighbors) {
+          const alt = (dists[currNode] !== undefined ? dists[currNode] : Infinity) + edge.dist;
+          if (dists[edge.node] === undefined || alt < dists[edge.node]) {
+            dists[edge.node] = alt;
+            prev[edge.node] = currNode;
+            pq.enqueue(edge.node, alt);
+          }
+        }
+      }
+
+      if (dists[virtualEnd] === undefined) return null;
+
+      const path = [];
+      let current = virtualEnd;
+      while (current !== undefined) {
+        path.push(current);
+        current = prev[current];
+      }
+      path.reverse();
+
+      return path.filter(node => node !== "START" && node !== "END");
+    }
+
+    class PriorityQueue {
+      constructor() { this.items = []; }
+      enqueue(element, priority) {
+        const queueElement = { element, priority };
+        let added = false;
+        for (let i = 0; i < this.items.length; i++) {
+          if (queueElement.priority < this.items[i].priority) {
+            this.items.splice(i, 0, queueElement);
+            added = true;
+            break;
+          }
+        }
+        if (!added) this.items.push(queueElement);
+      }
+      dequeue() { return this.items.shift(); }
+      isEmpty() { return this.items.length === 0; }
+    }
+
+    // --- 5. Main Route Control ---
+    function calculateRoute() {
+      const start = document.getElementById('start-search').value.trim();
+      const end = document.getElementById('end-search').value.trim();
+
+      if (!start || !mapDict[start]) {
+        showAlert('請選擇正確的起點地圖！');
+        return;
+      }
+      if (!end || !mapDict[end]) {
+        showAlert('請選擇正確的終點地圖！');
+        return;
+      }
+
+      const allowedTypes = [];
+      if (document.getElementById('allow-blue').checked) allowedTypes.push('blue');
+      if (document.getElementById('allow-yellow').checked) allowedTypes.push('yellow');
+      if (document.getElementById('allow-red').checked) allowedTypes.push('red');
+
+      if (allowedTypes.length === 0) {
+        showAlert('請至少選擇一種通行區域安全級別！');
+        return;
+      }
+
+      const routeResult = findOptimalRoute(start, end, allowedTypes);
+
+      if (!routeResult || routeResult.length === 0) {
+        showAlert('此起迄點與過濾條件下無連通通路！請更改通行安全限制。');
+        return;
+      }
+
+      activeRoute = routeResult;
+      processPathSteps();
+
+      document.getElementById('route-placeholder').classList.add('hidden');
+      document.getElementById('route-panel').classList.remove('hidden');
+      document.getElementById('map-nav-controllers').classList.remove('hidden');
+      document.getElementById('active-step-overlay-card').classList.remove('hidden');
+
+      stopAutoPlay();
+      currentRouteIndex = 0;
+
+      // Layout spatial positions of maps relative to each other!
+      calculateMapTopologicalPositions();
+
+      // Viewport centering
+      centerViewOnPath();
+
+      // Render Visualizations
+      renderTopologyCanvas();
+      renderRouteList();
+      updateFocusedStepDetails();
+    }
+
+    function processPathSteps() {
+      activeRouteStepsDetails = [];
+      
+      let i = 0;
+      while (i < activeRoute.length) {
+        const [mapName, portName] = activeRoute[i].split(':');
+        
+        if (i + 1 < activeRoute.length && activeRoute[i+1].startsWith(mapName + ':')) {
+          const [, nextPort] = activeRoute[i+1].split(':');
+          const dist = computePortDistance(portName, nextPort);
+          activeRouteStepsDetails.push({
+            mapName: mapName,
+            entryPort: portName,
+            exitPort: nextPort,
+            distance: dist
+          });
+          i += 2; 
+        } else {
+          activeRouteStepsDetails.push({
+            mapName: mapName,
+            entryPort: portName,
+            exitPort: portName,
+            distance: 0
+          });
+          i += 1;
+        }
+      }
+    }
+
+    // --- 6. Relative Map Topological Placement with 3D Stack Layering ---
+    function calculateMapTopologicalPositions() {
+      if (activeRouteStepsDetails.length === 0) return;
+
+      // Direction vectors (Isometric angles converted to screen offsets)
+      // Standard isometric grids: 45, 135, 225, 315 direction offsets
+      const directions = {
+        'NE':  { x: 1,  y: -1 },
+        'NW':  { x: -1, y: -1 },
+        'SW':  { x: -1, y: 1 },
+        'SE':  { x: 1,  y: 1 },
+        'CPE': { x: 1,  y: 0 },
+        'CPW': { x: -1, y: 0 },
+        'CPN': { x: 0,  y: -1 },
+        'CPS': { x: 0,  y: 1 },
+        'CP':  { x: 0,  y: 0 } // CP means transition straight on same node / vertical elevator portal
+      };
+
+      // Set initial map at origin
+      let coords = [];
+      coords[0] = { x: 0, y: 0, z: 0 };
+
+      // Traversed placement loop
+      for (let i = 1; i < activeRouteStepsDetails.length; i++) {
+        const prevStep = activeRouteStepsDetails[i - 1];
+        const currentStep = activeRouteStepsDetails[i];
+        
+        const exitDir = prevStep.exitPort;
+        const offsetVec = directions[exitDir] || { x: 0, y: 0 };
+
+        // Relative spatial mapping
+        let targetX = coords[i - 1].x + offsetVec.x;
+        let targetY = coords[i - 1].y + offsetVec.y;
+        let targetZ = coords[i - 1].z;
+
+        // Special condition: portal transitions to 'CP' on same space, increase Z level stack
+        if (exitDir === 'CP') {
+          targetZ = coords[i - 1].z + 1;
+        }
+
+        // --- Collision Avoidance / Layer Stacking Engine ---
+        // If the calculated (X,Y) space is already taken by a map in the path chain, 
+        // we automatically stack it up vertically (increment Z) to avoid overlapping.
+        let occupied = true;
+        while (occupied) {
+          occupied = false;
+          for (let j = 0; j < i; j++) {
+            if (coords[j].x === targetX && coords[j].y === targetY && coords[j].z === targetZ) {
+              occupied = true;
+              targetZ++; // Lift up to next layer
+              break;
+            }
+          }
+        }
+
+        coords[i] = { x: targetX, y: targetY, z: targetZ };
+      }
+
+      // Assign coordinates back to steps
+      activeRouteStepsDetails.forEach((step, idx) => {
+        step.coords = coords[idx];
+      });
+    }
+
+    // --- 7. SVG Topological Rendering engine ---
+    function renderTopologyCanvas() {
+      const blocksGroup = document.getElementById('map-blocks-group');
+      const pillarsG = document.getElementById('map-3d-pillars');
+      const connectionsG = document.getElementById('map-route-connections');
+
+      blocksGroup.innerHTML = '';
+      pillarsG.innerHTML = '';
+      connectionsG.innerHTML = '';
+
+      // Grid constants
+      const spacingX = 140; // Isometric width scaling
+      const spacingY = 90;  // Isometric height scaling
+      const zLift = 100;    // Lift offset height per layer
+
+      // Convert logical map grid coordinate into screen coordinate projection
+      function getScreenCoordinates(coord) {
+        // Isometric calculation
+        // X screen projection is skewed horizontally
+        // Y screen projection is skewed vertically plus lifted up by Z layer times the zLift factor
+        const sx = coord.x * spacingX;
+        const sy = coord.y * spacingY - (coord.z * zLift);
+        return { x: sx, y: sy };
+      }
+
+      // 1. Draw 3D Pillars for layer-shifting transition elevators (Same relative coordinate, higher Z)
+      for (let i = 1; i < activeRouteStepsDetails.length; i++) {
+        const prev = activeRouteStepsDetails[i-1];
+        const curr = activeRouteStepsDetails[i];
+        
+        if (prev.coords.x === curr.coords.x && prev.coords.y === curr.coords.y) {
+          const p1 = getScreenCoordinates(prev.coords);
+          const p2 = getScreenCoordinates(curr.coords);
+
+          // Render elevator tower cylinder/pillar
+          const pillarLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          pillarLine.setAttribute('x1', p1.x);
+          pillarLine.setAttribute('y1', p1.y);
+          pillarLine.setAttribute('x2', p2.x);
+          pillarLine.setAttribute('y2', p2.y);
+          pillarLine.setAttribute('stroke', '#8b5cf6');
+          pillarLine.setAttribute('stroke-width', '2.5');
+          pillarLine.setAttribute('stroke-dasharray', '4,4');
+          pillarLine.setAttribute('marker-end', 'url(#arrow-pillar)');
+          pillarsG.appendChild(pillarLine);
+          
+          // Render glowing dot indicator
+          const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          dot.setAttribute('cx', p2.x);
+          dot.setAttribute('cy', p2.y);
+          dot.setAttribute('r', '4');
+          dot.setAttribute('fill', '#c084fc');
+          pillarsG.appendChild(dot);
+        }
+      }
+
+      // 2. Draw normal pathway connections across boundaries
+      for (let i = 1; i < activeRouteStepsDetails.length; i++) {
+        const prev = activeRouteStepsDetails[i-1];
+        const curr = activeRouteStepsDetails[i];
+        
+        // Skip vertical portal stack links (which are already handled by pillars)
+        if (prev.coords.x === curr.coords.x && prev.coords.y === curr.coords.y) continue;
+
+        const p1 = getScreenCoordinates(prev.coords);
+        const p2 = getScreenCoordinates(curr.coords);
+
+        // Fetch transition exit/entry ports local offsets
+        const offsetExit = portCoordinatesLocal[prev.exitPort] || { x: 0, y: 0 };
+        const offsetEntry = portCoordinatesLocal[curr.entryPort] || { x: 0, y: 0 };
+
+        const startX = p1.x + offsetExit.x;
+        const startY = p1.y + offsetExit.y;
+        const endX = p2.x + offsetEntry.x;
+        const endY = p2.y + offsetEntry.y;
+
+        const link = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        link.setAttribute('x1', startX);
+        link.setAttribute('y1', startY);
+        link.setAttribute('x2', endX);
+        link.setAttribute('y2', endY);
+        link.setAttribute('stroke', '#fbbf24');
+        link.setAttribute('stroke-width', '3');
+        link.setAttribute('marker-end', 'url(#arrow)');
+        connectionsG.appendChild(link);
+      }
+
+      // 3. Draw Isometric Map Blocks (Diamond Cards)
+      activeRouteStepsDetails.forEach((step, idx) => {
+        const map = mapDict[step.mapName];
+        if (!map) return;
+
+        const sPos = getScreenCoordinates(step.coords);
+        const climate = climateThemes[map.climate] || climateThemes['green'];
+        const zone = zoneTypes[map.type] || zoneTypes['blue'];
+
+        // Determine step visual states
+        let opacity = '0.35';
+        let strokeColor = 'rgba(255,255,255,0.1)';
+        let strokeWidth = '1';
+        let highlightGlow = '';
+
+        if (idx === currentRouteIndex) {
+          opacity = '1.0';
+          strokeColor = '#fbbf24'; // Active golden focus
+          strokeWidth = '2.5';
+          highlightGlow = 'filter: url(#shadow);';
+        } else if (idx === currentRouteIndex - 1 || idx === currentRouteIndex + 1) {
+          opacity = '0.85';
+          strokeColor = 'rgba(255,255,255,0.7)';
+          strokeWidth = '1.5';
+        }
+
+        // Diamond container Group
+        const blockGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        blockGroup.setAttribute('class', 'cursor-pointer transition-all duration-300');
+        blockGroup.setAttribute('style', `opacity: ${opacity}; ${highlightGlow}`);
+        blockGroup.onclick = () => jumpToStep(idx);
+
+        // Core Isometric Diamond Polygon (Scaled to 90px wide, 45px tall)
+        const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        diamond.setAttribute('points', `${sPos.x},${sPos.y - 30} ${sPos.x + 60},${sPos.y} ${sPos.x},${sPos.y + 30} ${sPos.x - 60},${sPos.y}`);
+        diamond.setAttribute('fill', climate.bg);
+        diamond.setAttribute('stroke', strokeColor);
+        diamond.setAttribute('stroke-width', strokeWidth);
+        blockGroup.appendChild(diamond);
+
+        // Map Zone level boundary accent ring
+        const borderRing = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        borderRing.setAttribute('points', `${sPos.x},${sPos.y - 27} ${sPos.x + 54},${sPos.y} ${sPos.x},${sPos.y + 27} ${sPos.x - 54},${sPos.y}`);
+        borderRing.setAttribute('fill', 'none');
+        borderRing.setAttribute('stroke', zone.border);
+        borderRing.setAttribute('stroke-width', '1.5');
+        borderRing.setAttribute('stroke-opacity', '0.5');
+        blockGroup.appendChild(borderRing);
+
+        // Map Title Text
+        const titleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        titleText.setAttribute('x', sPos.x);
+        titleText.setAttribute('y', sPos.y - 38);
+        titleText.setAttribute('fill', idx === currentRouteIndex ? '#fbbf24' : '#e2e8f0');
+        titleText.setAttribute('font-size', '10px');
+        titleText.setAttribute('font-weight', 'bold');
+        titleText.setAttribute('text-anchor', 'middle');
+        titleText.textContent = `${map.name}`;
+        blockGroup.appendChild(titleText);
+
+        // Climate indicator badge (colored circle inside map)
+        const climateBadge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        climateBadge.setAttribute('cx', sPos.x - 45);
+        climateBadge.setAttribute('cy', sPos.y - 20);
+        climateBadge.setAttribute('r', '3.5');
+        climateBadge.setAttribute('fill', climate.color);
+        blockGroup.appendChild(climateBadge);
+
+        // Map level label
+        const lvlText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        lvlText.setAttribute('x', sPos.x - 38);
+        lvlText.setAttribute('y', sPos.y - 17);
+        lvlText.setAttribute('fill', '#94a3b8');
+        lvlText.setAttribute('font-size', '8px');
+        lvlText.setAttribute('font-weight', 'bold');
+        lvlText.textContent = `${map.tier}`;
+        blockGroup.appendChild(lvlText);
+
+        // Draw current step walking trail inside this diamond
+        if (step.entryPort && step.exitPort && step.entryPort !== step.exitPort) {
+          const lEntry = portCoordinatesLocal[step.entryPort];
+          const lExit = portCoordinatesLocal[step.exitPort];
+
+          const innerTrail = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          innerTrail.setAttribute('x1', sPos.x + lEntry.x);
+          innerTrail.setAttribute('y1', sPos.y + lEntry.y);
+          innerTrail.setAttribute('x2', sPos.x + lExit.x);
+          innerTrail.setAttribute('y2', sPos.y + lExit.y);
+          innerTrail.setAttribute('stroke', '#fbbf24');
+          innerTrail.setAttribute('stroke-width', '2.5');
+          innerTrail.setAttribute('class', 'path-flow-animation');
+          blockGroup.appendChild(innerTrail);
+        }
+
+        // Draw ports indicators
+        const portNames = ['NE', 'SE', 'SW', 'NW', 'CP', 'CPN', 'CPE', 'CPS', 'CPW'];
+        portNames.forEach(p => {
+          if (!map[p] && p !== 'CP') return;
+
+          const lCoord = portCoordinatesLocal[p];
+          const isEntry = p === step.entryPort;
+          const isExit = p === step.exitPort;
+
+          let ptCol = 'rgba(255, 255, 255, 0.4)';
+          let ptR = '2';
+
+          if (isEntry && isExit) { ptCol = '#fbbf24'; ptR = '4'; }
+          else if (isEntry) { ptCol = '#10b981'; ptR = '3.5'; }
+          else if (isExit) { ptCol = '#ef4444'; ptR = '3.5'; }
+          else if (map[p]) { ptCol = '#ffffff'; ptR = '1.5'; }
+
+          const portPt = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          portPt.setAttribute('cx', sPos.x + lCoord.x);
+          portPt.setAttribute('cy', sPos.y + lCoord.y);
+          portPt.setAttribute('r', ptR);
+          portPt.setAttribute('fill', ptCol);
+          portPt.setAttribute('stroke', '#000');
+          portPt.setAttribute('stroke-width', '0.5');
+          blockGroup.appendChild(portPt);
+        });
+
+        // Add 3D Z layer floor text indicator
+        const layerText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        layerText.setAttribute('x', sPos.x + 40);
+        layerText.setAttribute('y', sPos.y - 20);
+        layerText.setAttribute('fill', '#4b5563');
+        layerText.setAttribute('font-size', '8px');
+        layerText.setAttribute('font-weight', 'semibold');
+        layerText.textContent = `Lvl ${step.coords.z}`;
+        blockGroup.appendChild(layerText);
+
+        blocksGroup.appendChild(blockGroup);
+      });
+    }
+
+    // --- 8. Panoramic Viewport Camera Logic (Pan & Zoom) ---
+    const transformGroup = document.getElementById('map-transform-group');
+    const viewportSvg = document.getElementById('map-viewport');
+
+    viewportSvg.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startDragX = e.clientX - panX;
+      startDragY = e.clientY - panY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      panX = e.clientX - startDragX;
+      panY = e.clientY - startDragY;
+      applyCameraTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    viewportSvg.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = 1.1;
+      if (e.deltaY < 0) {
+        zoomLevel = Math.min(zoomLevel * zoomFactor, 2.5);
+      } else {
+        zoomLevel = Math.max(zoomLevel / zoomFactor, 0.3);
+      }
+      applyCameraTransform();
+    });
+
+    function applyCameraTransform() {
+      transformGroup.setAttribute('transform', `translate(${panX}, ${panY}) scale(${zoomLevel})`);
+    }
+
+    // Auto calculate bounding box and center path dynamically
+    function centerViewOnPath() {
+      if (activeRouteStepsDetails.length === 0) return;
+
+      const spacingX = 140;
+      const spacingY = 90;
+      const zLift = 100;
+
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+
+      activeRouteStepsDetails.forEach(step => {
+        const sx = step.coords.x * spacingX;
+        const sy = step.coords.y * spacingY - (step.coords.z * zLift);
+        
+        if (sx < minX) minX = sx;
+        if (sx > maxX) maxX = sx;
+        if (sy < minY) minY = sy;
+        if (sy > maxY) maxY = sy;
+      });
+
+      // Add map diameter dimensions to margin bounds
+      minX -= 120; maxX += 120;
+      minY -= 120; maxY += 120;
+
+      const dx = maxX - minX;
+      const dy = maxY - minY;
+
+      const viewWidth = viewportSvg.clientWidth || 800;
+      const viewHeight = viewportSvg.clientHeight || 500;
+
+      // Fit scale zoom correctly
+      zoomLevel = Math.min(viewWidth / dx, viewHeight / dy, 1.2);
+      zoomLevel = Math.max(zoomLevel, 0.4);
+
+      // Centered translation coordinates
+      panX = viewWidth / 2 - (minX + dx / 2) * zoomLevel;
+      panY = viewHeight / 2 - (minY + dy / 2) * zoomLevel;
+
+      applyCameraTransform();
+    }
+
+    function resetCamera() {
+      centerViewOnPath();
+    }
+
+    // --- 9. List View Renderer ---
+    function renderRouteList() {
+      const listContainer = document.getElementById('route-steps');
+      const statsBadge = document.getElementById('route-stats');
+
+      let totalWeight = 0;
+      activeRouteStepsDetails.forEach(s => totalWeight += s.distance);
+      statsBadge.textContent = `路程總長 ${totalWeight.toFixed(1)} km`;
+
+      listContainer.innerHTML = activeRouteStepsDetails.map((step, idx) => {
+        const map = mapDict[step.mapName];
+        const activeClass = idx === currentRouteIndex ? 'border-amber-500 bg-amber-500/10' : 'border-zinc-800 bg-black hover:bg-zinc-900';
+        const zoneBadgeClass = zoneTypes[map.type]?.border + " " + zoneTypes[map.type]?.textClass;
+        const s = step.coords;
+        return `
+          <div class="p-3 border rounded flex items-center justify-between cursor-pointer transition ${activeClass}" onclick="jumpToStep(${idx})">
+            <div class="flex items-center gap-2.5">
+              <span class="w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-black ${idx === currentRouteIndex ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'}">
+                ${idx + 1}
+              </span>
+              <div>
+                <p class="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                  ${step.mapName} 
+                  <span class="text-[8px] text-zinc-500 mono-font">[X:${s.x},Y:${s.y},Z:${s.z}]</span>
+                </p>
+                <p class="text-[10px] text-zinc-500 mt-0.5">
+                  自 ${step.entryPort} 
+                  ${step.entryPort !== step.exitPort ? `<i class="fa-solid fa-arrow-right text-[8px] mx-1"></i> 往 ${step.exitPort}` : '(終點)'}
+                </p>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-[9px] px-1 py-0.5 rounded font-black bg-zinc-950 border" style="border-color: ${zoneTypes[map.type]?.border}; color: ${zoneTypes[map.type]?.border}">${map.tier}</span>
+              <p class="text-[9px] text-amber-500 font-bold mt-1">${step.distance > 0 ? step.distance.toFixed(1) + ' km' : '終點'}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // --- 10. Bottom Details Indicator Sync ---
+    function updateFocusedStepDetails() {
+      const step = activeRouteStepsDetails[currentRouteIndex];
+      if (!step) return;
+
+      const map = mapDict[step.mapName];
+      if (!map) return;
+
+      const zone = zoneTypes[map.type] || zoneTypes['blue'];
+      const climate = climateThemes[map.climate] || climateThemes['green'];
+
+      document.getElementById('overlay-map-name').textContent = step.mapName;
+      document.getElementById('overlay-map-tier').textContent = `${map.tier} 階`;
+      
+      const zoneBadge = document.getElementById('overlay-map-zone');
+      zoneBadge.textContent = zone.cn;
+      zoneBadge.className = `px-1.5 py-0.5 rounded text-[10px] font-bold ${zone.bgClass}`;
+
+      document.getElementById('overlay-map-climate').textContent = climate.cn;
+      
+      const isLastStep = currentRouteIndex === activeRouteStepsDetails.length - 1;
+      const dirBadge = document.getElementById('overlay-dir-badge');
+      const badgeDirText = document.getElementById('overlay-badge-dir');
+      const badgeIndexText = document.getElementById('overlay-badge-index');
+
+      badgeDirText.textContent = isLastStep ? 'END' : step.exitPort;
+      badgeIndexText.textContent = `${currentRouteIndex + 1}/${activeRouteStepsDetails.length}`;
+
+      if (isLastStep) {
+        dirBadge.className = "w-12 h-12 rounded flex flex-col items-center justify-center font-black text-xs bg-amber-500 text-black shadow-inner";
+        document.getElementById('overlay-instruction').innerHTML = `已抵達最終目的地地圖：<span class="text-white font-bold">${step.mapName}</span>。`;
+        document.getElementById('overlay-map-distance').textContent = '🏁';
+      } else {
+        dirBadge.className = "w-12 h-12 rounded flex flex-col items-center justify-center font-black text-xs bg-zinc-900 border border-zinc-700 text-amber-400 shadow-inner";
+        
+        let moveTxt = `由 <span class="text-emerald-400 font-bold">${step.entryPort}門</span> 進入，在圖內行進並從 <span class="text-red-400 font-bold">${step.exitPort}門</span> 出去。`;
+        if (step.exitPort === 'CP') {
+          moveTxt += `此為中央入口，將垂直切換至上層疊加結構。`;
+        } else {
+          moveTxt += `接續跨界前往鄰近地圖「<span class="text-white font-bold">${map[step.exitPort]}</span>」。`;
+        }
+        document.getElementById('overlay-instruction').innerHTML = moveTxt;
+        document.getElementById('overlay-map-distance').textContent = `${step.distance.toFixed(1)} km`;
+      }
+    }
+
+    // --- 11. Navigation Loop Controller ---
+    function nextStep() {
+      if (activeRouteStepsDetails.length === 0) return;
+      if (currentRouteIndex < activeRouteStepsDetails.length - 1) {
+        currentRouteIndex++;
+      } else {
+        currentRouteIndex = 0; 
+      }
+      updateStepViews();
+    }
+
+    function prevStep() {
+      if (activeRouteStepsDetails.length === 0) return;
+      if (currentRouteIndex > 0) {
+        currentRouteIndex--;
+        updateStepViews();
+      }
+    }
+
+    function jumpToStep(idx) {
+      currentRouteIndex = idx;
+      updateStepViews();
+    }
+
+    function updateStepViews() {
+      renderTopologyCanvas();
+      renderRouteList();
+      updateFocusedStepDetails();
+    }
+
+    function toggleAutoPlay() {
+      if (isPlaying) {
+        stopAutoPlay();
+      } else {
+        startAutoPlay();
+      }
+    }
+
+    function startAutoPlay() {
+      isPlaying = true;
+      const playBtn = document.getElementById('play-btn');
+      playBtn.className = "px-4 h-9 rounded bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition flex items-center justify-center gap-1 animate-pulse";
+      playBtn.innerHTML = `<i class="fa-solid fa-pause"></i> <span>暫停</span>`;
+
+      playInterval = setInterval(() => {
+        nextStep();
+      }, 3000);
+    }
+
+    function stopAutoPlay() {
+      isPlaying = false;
+      const playBtn = document.getElementById('play-btn');
+      playBtn.className = "px-4 h-9 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center justify-center gap-1";
+      playBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span>自動播</span>`;
+
+      if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+      }
+    }
+
+    // Window Startup Trigger
+    window.onload = function() {
+      fetchOnlineCSV();
+    };
+  </script>
+</body>
+</html>
