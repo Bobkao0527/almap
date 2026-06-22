@@ -62,22 +62,22 @@
 <body class="min-h-screen flex flex-col overflow-x-hidden">
 
   <!-- Header -->
-  <header class="border-b border-zinc-800 bg-black px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 sticky top-0">
-    <div class="flex items-center gap-3">
-      <div class="bg-zinc-900 border border-zinc-700 p-2 rounded">
-        <i class="fa-solid fa-compass text-amber-500 text-lg"></i>
+  <header class="border-b border-zinc-800 bg-black px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 z-10 sticky top-0">
+    <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center sm:justify-start">
+      <div class="bg-zinc-900 border border-zinc-700 p-1.5 sm:p-2 rounded shrink-0">
+        <i class="fa-solid fa-compass text-amber-500 text-base sm:text-lg"></i>
       </div>
-      <div>
-        <h1 class="text-xl font-black tracking-wider text-white uppercase flex items-center gap-2">
-          Albion Map <span class="text-xs font-normal text-zinc-500 px-1.5 py-0.5 border border-zinc-800 rounded">v3.0</span>
+      <div class="text-center sm:text-left">
+        <h1 class="text-lg sm:text-xl font-black tracking-wider text-white uppercase flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2">
+          Albion Map <span class="text-[10px] sm:text-xs font-normal text-zinc-500 px-1.5 py-0.5 border border-zinc-800 rounded shrink-0">v3.0</span>
         </h1>
-        <p class="text-xs text-zinc-400 font-medium">阿爾比恩皇家大陸導航系統 (聚焦與全景雙模式版)</p>
+        <p class="text-[10px] sm:text-xs text-zinc-400 font-medium">阿爾比恩皇家大陸導航系統 (聚焦與全景雙模式版)</p>
       </div>
     </div>
     
     <!-- Info Badge -->
-    <div class="flex items-center gap-3 text-xs flex-wrap justify-center">
-      <span id="data-status" class="px-3 py-1.5 rounded bg-yellow-950/40 text-yellow-400 border border-yellow-900/50 flex items-center gap-2 font-bold">
+    <div class="flex items-center gap-2 text-xs w-full sm:w-auto justify-center">
+      <span id="data-status" class="px-3 py-1.5 rounded bg-yellow-950/40 text-yellow-400 border border-yellow-900/50 flex items-center gap-1.5 sm:gap-2 font-bold text-[10px] sm:text-xs">
         <i class="fa-solid fa-spinner animate-spin"></i> 圖資載入中...
       </span>
     </div>
@@ -184,79 +184,87 @@
     <section class="flex-1 flex flex-col bg-black border border-zinc-800 rounded-xl p-4 sm:p-5 shadow-2xl relative overflow-hidden">
       
       <!-- Viewport Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-4 z-10">
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-900 border border-zinc-700 text-zinc-400 tracking-widest">3D RELATIVE TOPOLOGY MAP</span>
-            <span id="total-maps-count" class="text-xs text-zinc-500"></span>
+      <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-4 z-10">
+        <div class="text-center xl:text-left">
+          <div class="flex items-center justify-center xl:justify-start gap-2">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-900 border border-zinc-700 text-zinc-400 tracking-widest shrink-0">3D RELATIVE TOPOLOGY MAP</span>
+            <span id="total-maps-count" class="text-[10px] sm:text-xs text-zinc-500"></span>
           </div>
-          <h3 id="flow-visualizer-title" class="text-lg font-bold text-white mt-0.5">
+          <h3 id="flow-visualizer-title" class="text-base sm:text-lg font-bold text-white mt-1">
             皇家大陸地理全景
           </h3>
         </div>
         
         <!-- Interactive Controls -->
-        <div id="map-nav-controllers" class="flex items-center gap-2 hidden flex-wrap">
+        <div id="map-nav-controllers" class="flex items-center justify-center gap-2.5 hidden flex-wrap w-full xl:w-auto">
           
           <!-- Mode Toggles -->
-          <div class="bg-zinc-900 rounded p-1 flex items-center gap-1 mr-2 border border-zinc-800">
+          <div class="bg-zinc-900 rounded p-1 flex items-center gap-1 border border-zinc-800 shrink-0">
             <button id="btn-mode-panoramic" onclick="setViewMode('panoramic')" class="px-3 py-1.5 rounded bg-zinc-700 text-white text-xs font-bold transition">全景模式</button>
             <button id="btn-mode-focus" onclick="setViewMode('focus')" class="px-3 py-1.5 rounded text-zinc-400 hover:text-white text-xs font-bold transition">聚焦模式</button>
           </div>
 
-          <button onclick="prevStep()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="上一張">
-            <i class="fa-solid fa-chevron-left"></i>
-          </button>
-          
-          <button id="play-btn" onclick="toggleAutoPlay()" class="px-4 h-9 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center justify-center gap-1" title="自動播放路徑">
-            <i class="fa-solid fa-play"></i> <span>自動播</span>
-          </button>
-          
-          <button onclick="nextStep()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="下一張">
-            <i class="fa-solid fa-chevron-right"></i>
-          </button>
-          
-          <div class="border-l border-zinc-800 h-6 mx-1"></div>
-          
-          <button onclick="resetCamera()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="置中重設視角">
-            <i class="fa-solid fa-compress"></i>
-          </button>
+          <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button onclick="prevStep()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="上一張">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            
+            <button id="play-btn" onclick="toggleAutoPlay()" class="px-3 sm:px-4 h-9 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-[11px] sm:text-xs transition flex items-center justify-center gap-1 min-w-[70px] sm:min-w-[80px]" title="自動播放路徑">
+              <i class="fa-solid fa-play"></i> <span>自動播</span>
+            </button>
+            
+            <button onclick="nextStep()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="下一張">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            
+            <div class="border-l border-zinc-800 h-5 mx-0.5 sm:mx-1 hidden sm:block"></div>
+            
+            <button onclick="resetCamera()" class="w-9 h-9 rounded bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 transition flex items-center justify-center text-xs" title="置中重設視角">
+              <i class="fa-solid fa-compress"></i>
+            </button>
+          </div>
         </div>
       </div>
 
       <!-- Canvas Viewport -->
-      <div class="flex-1 relative flex flex-col justify-between min-h-[500px]">
+      <div class="flex-1 relative flex flex-col justify-between min-h-[350px] sm:min-h-[500px]">
         
         <!-- Legend overlays for clear information -->
-        <div class="absolute top-2 left-2 z-10 flex flex-col gap-1.5 text-[10px] bg-black/90 border border-zinc-800 p-2.5 rounded shadow-lg backdrop-blur">
-          <p class="font-bold text-zinc-400 border-b border-zinc-800 pb-1 mb-1">圖例說明 (氣候與區域)</p>
-          <div class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full color-dot-white inline-block"></span> <span>雪地 / 山嶽 (White)</span>
+        <div class="absolute top-2 left-2 z-10 bg-black/90 border border-zinc-800 p-2 sm:p-2.5 rounded shadow-lg backdrop-blur w-auto max-w-[180px] sm:max-w-none transition-all">
+          <div class="flex items-center justify-between sm:hidden mb-0.5 cursor-pointer select-none px-1" onclick="document.getElementById('legend-content').classList.toggle('hidden')">
+            <span class="text-[10px] font-bold text-zinc-300 flex items-center"><i class="fa-solid fa-circle-info mr-1.5 text-zinc-400"></i>開啟圖例</span>
+            <i class="fa-solid fa-chevron-down text-zinc-500 text-[10px] ml-2"></i>
           </div>
-          <div class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full color-dot-green inline-block"></span> <span>森林 (Green)</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full color-dot-yellow inline-block"></span> <span>草原 (Yellow)</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full color-dot-blue inline-block"></span> <span>高地 (Blue)</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full color-dot-purple inline-block"></span> <span>沼澤 (Purple)</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full color-dot-red inline-block"></span> <span>紅城 / 皇家 (Red)</span>
-          </div>
-          <p class="mt-1.5 font-bold text-zinc-400 border-b border-zinc-800 pb-1 mb-1">安全等級外框</p>
-          <div class="flex items-center gap-1.5">
-            <span class="w-3 h-3 border-[2.5px] border-blue-500 inline-block"></span> <span>藍區 (安全)</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <span class="w-3 h-3 border-[2.5px] border-yellow-500 inline-block"></span> <span>黃區 (不掉裝PVP)</span>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <span class="w-3 h-3 border-[2.5px] border-red-500 inline-block"></span> <span>紅區 (掉裝PVP)</span>
+          <div id="legend-content" class="hidden sm:flex flex-col gap-1.5 text-[10px]">
+            <p class="hidden sm:block font-bold text-zinc-400 border-b border-zinc-800 pb-1 mb-1">圖例說明 (氣候與區域)</p>
+            <div class="flex items-center gap-1.5 mt-1 sm:mt-0">
+              <span class="w-2.5 h-2.5 rounded-full color-dot-white inline-block shrink-0"></span> <span class="truncate">雪地 / 山嶽 (White)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full color-dot-green inline-block shrink-0"></span> <span class="truncate">森林 (Green)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full color-dot-yellow inline-block shrink-0"></span> <span class="truncate">草原 (Yellow)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full color-dot-blue inline-block shrink-0"></span> <span class="truncate">高地 (Blue)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full color-dot-purple inline-block shrink-0"></span> <span class="truncate">沼澤 (Purple)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full color-dot-red inline-block shrink-0"></span> <span class="truncate">紅城 / 皇家 (Red)</span>
+            </div>
+            <p class="mt-1.5 font-bold text-zinc-400 border-b border-zinc-800 pb-1 mb-1">安全等級外框</p>
+            <div class="flex items-center gap-1.5 mt-1 sm:mt-0">
+              <span class="w-3 h-3 border-[2.5px] border-blue-500 inline-block shrink-0"></span> <span class="truncate">藍區 (安全)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 border-[2.5px] border-yellow-500 inline-block shrink-0"></span> <span class="truncate">黃區 (不掉裝PVP)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 border-[2.5px] border-red-500 inline-block shrink-0"></span> <span class="truncate">紅區 (掉裝PVP)</span>
+            </div>
           </div>
         </div>
 
@@ -302,33 +310,33 @@
         <div id="route-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-0 pointer-events-none">
           <i class="fa-solid fa-map-marked-alt text-5xl text-zinc-800 mb-3"></i>
           <h4 class="text-sm font-bold text-zinc-500 mb-1">未載入路徑軌跡</h4>
-          <p class="text-xs text-zinc-600 max-w-sm leading-relaxed">請於左側輸入起迄點進行規劃，以建立阿爾比恩地理相對位置全景網路。</p>
+          <p class="text-[11px] sm:text-xs text-zinc-600 max-w-sm leading-relaxed">請於左側輸入起迄點進行規劃，以建立阿爾比恩地理相對位置全景網路。</p>
         </div>
 
         <!-- Selected Focus Map Card Detailed Info Badge -->
-        <div id="active-step-overlay-card" class="bg-black border border-zinc-800 rounded-lg p-4 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-4 hidden z-10">
-          <div class="flex items-center gap-3">
-            <div id="overlay-dir-badge" class="w-12 h-12 rounded flex flex-col items-center justify-center font-black text-xs text-black shadow-inner">
+        <div id="active-step-overlay-card" class="bg-black border border-zinc-800 rounded-lg p-3 sm:p-4 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4 mt-3 sm:mt-4 hidden z-10">
+          <div class="flex items-center gap-2.5 sm:gap-3 w-full md:w-auto">
+            <div id="overlay-dir-badge" class="w-10 h-10 sm:w-12 sm:h-12 rounded flex flex-col items-center justify-center font-black text-xs text-black shadow-inner shrink-0">
               <span id="overlay-badge-dir" class="mono-font">-</span>
-              <span id="overlay-badge-index" class="text-[9px] opacity-70">0/0</span>
+              <span id="overlay-badge-index" class="text-[8px] sm:text-[9px] opacity-70">0/0</span>
             </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <h4 id="overlay-map-name" class="text-base font-bold text-white">地圖名稱</h4>
-                <span id="overlay-map-tier" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400">V 階</span>
-                <span id="overlay-map-zone" class="px-1.5 py-0.5 rounded text-[10px] font-bold">區域狀態</span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <h4 id="overlay-map-name" class="text-sm sm:text-base font-bold text-white truncate">地圖名稱</h4>
+                <span id="overlay-map-tier" class="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 shrink-0">V 階</span>
+                <span id="overlay-map-zone" class="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold shrink-0">區域狀態</span>
               </div>
-              <p id="overlay-instruction" class="text-xs text-zinc-400 mt-1">進入點門：-- 往 出口門：-- 移動中</p>
+              <p id="overlay-instruction" class="text-[11px] sm:text-xs text-zinc-400 mt-1 line-clamp-2">進入點門：-- 往 出口門：-- 移動中</p>
             </div>
           </div>
-          <div class="flex gap-4 md:text-right shrink-0">
+          <div class="flex gap-3 sm:gap-4 w-full md:w-auto justify-between md:justify-end border-t border-zinc-800 md:border-t-0 pt-2 md:pt-0 shrink-0">
             <div>
-              <p class="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">目前地圖氣候</p>
-              <p id="overlay-map-climate" class="text-xs font-bold text-zinc-300">森林</p>
+              <p class="text-[8px] sm:text-[9px] text-zinc-500 font-bold uppercase tracking-wider">目前地圖氣候</p>
+              <p id="overlay-map-climate" class="text-[11px] sm:text-xs font-bold text-zinc-300">森林</p>
             </div>
-            <div class="border-l border-zinc-800 pl-4">
-              <p class="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">地圖內耗時估算</p>
-              <p id="overlay-map-distance" class="text-sm font-black text-amber-500">0.0 km</p>
+            <div class="border-l border-zinc-800 pl-3 sm:pl-4 text-right">
+              <p class="text-[8px] sm:text-[9px] text-zinc-500 font-bold uppercase tracking-wider">地圖內耗時估算</p>
+              <p id="overlay-map-distance" class="text-xs sm:text-sm font-black text-amber-500">0.0 km</p>
             </div>
           </div>
         </div>
